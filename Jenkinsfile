@@ -1,6 +1,3 @@
-cd ~/day1-ci-demo
-
-cat > Jenkinsfile <<'EOF'
 pipeline {
   agent any
   environment {
