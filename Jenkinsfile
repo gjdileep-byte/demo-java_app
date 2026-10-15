@@ -1,4 +1,4 @@
-
+```groovy
 pipeline {
     agent any
 
@@ -6,23 +6,23 @@ pipeline {
         jdk 'java17'
     }
 
-    environment {
-        DOCKERHUB_USER = 'dileepgj'
-        IMAGE = 'day1-demo'
-    }
-
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                echo 'Source code checked out from Git'
             }
         }
 
-        stage('Check Java') {
+        stage('Check Java and Maven') {
             steps {
                 sh '''
+                    echo "Checking Java version"
                     java -version
+
+                    echo "Checking Java compiler"
                     javac -version
+
+                    echo "Checking Maven version"
                     mvn -version
                 '''
             }
@@ -30,57 +30,19 @@ pipeline {
 
         stage('Maven Test') {
             steps {
-                sh 'mvn -B clean test'
+                sh 'mvn clean test'
             }
         }
 
-        stage('Package') {
+        stage('Package Application') {
             steps {
-                sh 'mvn -B package -DskipTests'
-            }
-        }
-
-        stage('Build Image') {
-            steps {
-                sh '''
-                    docker build \
-                      -t "$DOCKERHUB_USER/$IMAGE:$BUILD_NUMBER" .
-                '''
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DH_USER',
-                        passwordVariable: 'DH_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-                        echo "$DH_TOKEN" |
-                          docker login -u "$DH_USER" --password-stdin
-
-                        docker push \
-                          "$DOCKERHUB_USER/$IMAGE:$BUILD_NUMBER"
-
-                        docker logout
-                    '''
-                }
+                sh 'mvn package -DskipTests'
+                sh 'ls -lh target/'
             }
         }
     }
 
     post {
-        always {
-            archiveArtifacts(
-                artifacts: 'target/*.jar',
-                allowEmptyArchive: true
-            )
-        }
-
         success {
             echo 'Pipeline completed successfully!'
         }
@@ -88,6 +50,10 @@ pipeline {
         failure {
             echo 'Pipeline failed. Check Console Output.'
         }
+
+        always {
+            echo 'Pipeline execution finished.'
+        }
     }
 }
-
+```
