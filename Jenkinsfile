@@ -1,59 +1,31 @@
-```groovy
+cd ~/day1-ci-demo
+
+cat > Jenkinsfile <<'EOF'
 pipeline {
-    agent any
-
-    tools {
-        jdk 'java17'
+  agent any
+  environment {
+    DOCKERHUB_USER = 'dileepgj'
+    IMAGE          = 'day1-demo'
+  }
+  stages {
+    stage('Checkout') { steps { checkout scm } }
+    stage('Test')     { steps { sh 'mvn -B clean test' } }
+    stage('Package')  { steps { sh 'mvn -B package -DskipTests' } }
+    stage('Build Image') {
+      steps { sh 'docker build -t $DOCKERHUB_USER/$IMAGE:$BUILD_NUMBER .' }
     }
-
-    stages {
-        stage('Checkout') {
-            steps {
-                echo 'Source code checked out from Git'
-            }
+    stage('Push to Docker Hub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+            usernameVariable: 'DH_USER', passwordVariable: 'DH_TOKEN')]) {
+          sh '''set +x
+echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin
+docker push "$DOCKERHUB_USER/$IMAGE:$BUILD_NUMBER"
+docker logout'''
         }
-
-        stage('Check Java and Maven') {
-            steps {
-                sh '''
-                    echo "Checking Java version"
-                    java -version
-
-                    echo "Checking Java compiler"
-                    javac -version
-
-                    echo "Checking Maven version"
-                    mvn -version
-                '''
-            }
-        }
-
-        stage('Maven Test') {
-            steps {
-                sh 'mvn clean test'
-            }
-        }
-
-        stage('Package Application') {
-            steps {
-                sh 'mvn package -DskipTests'
-                sh 'ls -lh target/'
-            }
-        }
+      }
     }
-
-    post {
-        success {
-            echo 'Pipeline completed successfully!'
-        }
-
-        failure {
-            echo 'Pipeline failed. Check Console Output.'
-        }
-
-        always {
-            echo 'Pipeline execution finished.'
-        }
-    }
+  }
+  post { always { archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true } }
 }
-```
+EOF
